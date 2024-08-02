@@ -36,6 +36,7 @@ func ShortenURL(c *gin.Context) {
 	err := c.ShouldBindJSON(&body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, map[string]string{"message": "error  binding data"})
+		return
 	}
 
 	//implement rate limiting
@@ -51,17 +52,20 @@ func ShortenURL(c *gin.Context) {
 		if intval <= 0 {
 			limit, _ := r2.TTL(database.Ctx, c.ClientIP()).Result()
 			c.JSON(http.StatusServiceUnavailable, map[string]interface{}{"error": "rate limit exceeded", "rate_limit_reset": (limit / time.Nanosecond) / time.Minute})
+			return
 		}
 	}
 
 	//check if input is an actual URL
 	if !govalidator.IsURL(body.URL) {
 		c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid URL"})
+		return
 	}
 
 	//Check for domain error
 	if helpers.RemoveDomainError(body.URL) {
 		c.JSON(http.StatusServiceUnavailable, map[string]string{"message": "Domain error"})
+		return
 	}
 
 	//enforce hhtps,SSL
@@ -80,6 +84,7 @@ func ShortenURL(c *gin.Context) {
 	value, _ := r.Get(database.Ctx, id).Result()
 	if value != "" {
 		c.JSON(http.StatusForbidden, map[string]interface{}{"error": "URL custon short is already in use"})
+		return
 	}
 
 	if body.Expiry == 0 {
